@@ -16,12 +16,15 @@ variable "ecs" {
     execution_role                     = string
     task_role                          = string
     container_definitions = list(object({
-      image     = string
       essential = bool
       portMappings = list(object({
         protocol      = string
         containerPort = number
         hostPort      = number
+      }))
+      environment = list(object({
+        name  = string
+        value = string
       }))
     }))
     network_configuration = object({

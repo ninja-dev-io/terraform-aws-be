@@ -1,16 +1,22 @@
+data "aws_region" "current" {}
+
 resource "aws_ecs_cluster" "cluster" {
   name = "${var.ecs.cluster_name}-cluster-${var.env}"
 }
 
 resource "aws_ecs_task_definition" "task" {
-  family                   = var.ecs.family
+  family                   = "${var.ecs.family}-service-${var.env}"
   network_mode             = var.ecs.network_mode
   requires_compatibilities = var.ecs.requires_compatibilities
   cpu                      = var.ecs.cpu
   memory                   = var.ecs.memory
   execution_role_arn       = lookup(var.roles, var.ecs.execution_role)
   task_role_arn            = lookup(var.roles, var.ecs.task_role)
-  container_definitions    = jsonencode([for definition in var.ecs.container_definitions : merge(definition, { name = "${var.ecs.container_name}-${var.env}" })])
+  container_definitions    = jsonencode([for definition in var.ecs.container_definitions : merge(definition, { name = "${var.ecs.container_name}-service-${var.env}", image = "${aws_ecr_repository.ecr.repository_url}:latest", logConfiguration = { logDriver = "awslogs", options = { awslogs-group = "${var.ecs.service_name}-service-${var.env}", awslogs-region = data.aws_region.current.name, awslogs-stream-prefix = "ecs" } } })])
+  depends_on = [
+    aws_ecr_repository.ecr,
+    aws_cloudwatch_log_group.logs
+  ]
 }
 
 resource "aws_ecs_service" "service" {
@@ -31,7 +37,7 @@ resource "aws_ecs_service" "service" {
 
   load_balancer {
     target_group_arn = lookup(var.target_groups, var.ecs.load_balancer.target_group)
-    container_name   = "${var.ecs.container_name}-${var.env}"
+    container_name   = "${var.ecs.container_name}-service-${var.env}"
     container_port   = var.ecs.load_balancer.container_port
   }
 
@@ -63,4 +69,9 @@ resource "aws_appautoscaling_policy" "policies" {
 
     target_value = each.value.target_value
   }
+}
+
+resource "aws_cloudwatch_log_group" "logs" {
+  name              = "${var.ecs.service_name}-service-${var.env}"
+  retention_in_days = "30"
 }
