@@ -1,6 +1,8 @@
 # terraform-aws-be
 backend IaC
 
+![alt text]([http://url/to/img.png](https://ibb.co/6nD89pQ))
+
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
