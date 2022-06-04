@@ -2,6 +2,10 @@ variable "env" {
   type = string
 }
 
+variable "vpc_id" {
+  type = string
+}
+
 variable "subnets" {
   type = map(string)
 }
@@ -11,7 +15,10 @@ variable "security_groups" {
 }
 
 variable "roles" {
-  type = map(string)
+  type = map(object({
+    id  = string
+    arn = string
+  }))
 }
 
 variable "target_groups" {

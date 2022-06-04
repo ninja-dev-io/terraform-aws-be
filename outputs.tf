@@ -1,17 +1,9 @@
-output "rds_hostname" {
-  description = "RDS instance hostname"
-  value       = aws_db_instance.rds.address
-  sensitive   = true
+output "databases" {
+  description = "RDS data"
+  value       = [for k, v in aws_db_instance.databases : { "address" : v.address, "port" : v.port, "username" : v.username }]
 }
 
-output "rds_port" {
-  description = "RDS instance port"
-  value       = aws_db_instance.rds.port
-  sensitive   = true
-}
-
-output "rds_username" {
-  description = "RDS instance root username"
-  value       = aws_db_instance.rds.username
-  sensitive   = true
+output "repository_url" {
+  description = "ECR repository url"
+  value       = aws_ecr_repository.ecr.repository_url
 }
