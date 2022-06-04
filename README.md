@@ -1,7 +1,7 @@
 # terraform-aws-be
 backend IaC
 
-![alt text](https://ibb.co/6nD89pQ)
+![ezcv logo](https://raw.githubusercontent.com/ninja-dev-io/terraform-aws-be/master/.github/consul-ecs-prod-secure-hcp.png)
 
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
