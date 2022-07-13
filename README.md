@@ -1,7 +1,7 @@
 # terraform-aws-be
 backend IaC
 
-![logo](https://raw.githubusercontent.com/ninja-dev-io/terraform-aws-be/master/logo.png)
+![logo](https://raw.githubusercontent.com/ninja-dev-io/terraform-aws-be/master/logo.jpg)
 
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
