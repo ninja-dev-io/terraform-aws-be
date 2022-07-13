@@ -4,52 +4,51 @@ resource "aws_ecs_cluster" "cluster" {
   name = "${var.ecs.cluster_name}-cluster-${var.env}"
 }
 
-module "consul_server" {
-  source                      = "./modules/consul"
-  env                         = var.env
-  vpc_id                      = var.vpc_id
-  cluster                     = aws_ecs_cluster.cluster.arn
-  requires_compatibilities    = var.ecs.consul_server.requires_compatibilities
-  cpu                         = var.ecs.consul_server.cpu
-  memory                      = var.ecs.consul_server.memory
-  subnets                     = [for subnet in var.ecs.consul_server.subnets : lookup(var.subnets, subnet)]
-  target_group                = lookup(var.target_groups, var.ecs.consul_server.target_group)
-  security_groups             = [for group in var.ecs.consul_server.security_groups : lookup(var.security_groups, group)]
-  lb_enabled                  = var.ecs.consul_server.lb_enabled
-  consul_image                = var.ecs.consul_server.consul_image
-  consul_license              = var.ecs.consul_server.consul_license
-  name                        = var.ecs.consul_server.name
-  service_discovery_namespace = var.ecs.consul_server.service_discovery_namespace
-  tags                        = var.ecs.consul_server.tags
-  launch_type                 = var.ecs.consul_server.launch_type
-  assign_public_ip            = var.ecs.consul_server.assign_public_ip
-  tls                         = var.ecs.consul_server.tls
-  gossip_key_secret_arn       = var.ecs.consul_server.gossip_key_secret_arn
-  acls                        = var.ecs.consul_server.acls
-  wait_for_steady_state       = var.ecs.consul_server.wait_for_steady_state
-  depends_on = [
-    aws_ecs_cluster.cluster
-  ]
-}
-
-module "task" {
+resource "aws_ecs_task_definition" "task" {
   for_each                 = { for task in var.ecs.tasks : task.name => task }
-  source                   = "./modules/task"
   family                   = "${each.key}-service-${var.env}"
+  network_mode             = each.value.network_mode
   requires_compatibilities = each.value.requires_compatibilities
   cpu                      = each.value.cpu
   memory                   = each.value.memory
-  port                     = each.value.port
-  execution_role           = lookup(var.roles, each.value.execution_role)
-  task_role                = lookup(var.roles, each.value.task_role)
-  retry_join               = [module.consul_server.server_dns]
-  log_configuration        = { logDriver = "awslogs", options = { awslogs-group = "${each.key}-service-${var.env}", awslogs-region = data.aws_region.current.name, awslogs-stream-prefix = "ecs" } }
-  consul_datacenter        = each.value.consul_datacenter
-  container_definitions    = [for definition in each.value.container_definitions : merge(definition, { name = "${each.key}-service-${var.env}", image = "${aws_ecr_repository.ecr.repository_url}:${each.key}", logConfiguration = { logDriver = "awslogs", options = { awslogs-group = "${each.key}-service-${var.env}", awslogs-region = data.aws_region.current.name, awslogs-stream-prefix = "ecs" } } })]
-  upstreams                = each.value.upstreams
+  execution_role_arn       = lookup(var.roles, each.value.execution_role)
+  task_role_arn            = lookup(var.roles, each.value.task_role)
+  container_definitions = jsonencode(
+    [for definition in concat([for definition in each.value.container_definitions :
+      merge(definition, {
+        name      = "${each.key}-service-${var.env}",
+        image     = "${aws_ecr_repository.ecr.repository_url}:${each.key}",
+        dependsOn = var.mesh != null ? [{ containerName = var.mesh.sidecar_proxy.name, condition = "HEALTHY" }] : []
+      })
+      ],
+      var.mesh != null ? [
+        merge(
+          var.mesh.sidecar_proxy,
+          { environment = concat(var.mesh.sidecar_proxy.environment, [{ name = "APPMESH_RESOURCE_ARN", value = lookup(one(module.mesh[*].virtual_nodes), each.key) }]) }
+      )] : []
+      ) : merge(definition, { logConfiguration = { logDriver = "awslogs",
+        options = { awslogs-group = "${each.key}-service-${var.env}",
+          awslogs-region = data.aws_region.current.name, awslogs-stream-prefix = "ecs"
+    } } })]
+  )
+
+  dynamic "proxy_configuration" {
+    for_each = var.mesh != null ? [var.mesh.proxy_configuration] : []
+    content {
+      type           = proxy_configuration.value.type
+      container_name = proxy_configuration.value.container_name
+      properties = {
+        AppPorts         = proxy_configuration.value.properties.AppPorts
+        EgressIgnoredIPs = proxy_configuration.value.properties.EgressIgnoredIPs
+        IgnoredUID       = proxy_configuration.value.properties.IgnoredUID
+        ProxyEgressPort  = proxy_configuration.value.properties.ProxyEgressPort
+        ProxyIngressPort = proxy_configuration.value.properties.ProxyIngressPort
+      }
+    }
+  }
   depends_on = [
     aws_ecr_repository.ecr,
-    module.consul_server
+    module.mesh
   ]
 }
 
@@ -57,7 +56,7 @@ resource "aws_ecs_service" "service" {
   for_each                           = { for service in var.ecs.services : service.name => service }
   name                               = "${each.key}-service-${var.env}"
   cluster                            = aws_ecs_cluster.cluster.id
-  task_definition                    = lookup(module.task, each.key).task_definition_arn
+  task_definition                    = lookup(aws_ecs_task_definition.task, each.key).arn
   desired_count                      = each.value.desired_count
   deployment_minimum_healthy_percent = each.value.deployment_minimum_healthy_percent
   deployment_maximum_percent         = each.value.deployment_maximum_percent
@@ -79,15 +78,19 @@ resource "aws_ecs_service" "service" {
     }
   }
 
-  enable_execute_command = true
-  propagate_tags         = "TASK_DEFINITION"
+  dynamic "service_registries" {
+    for_each = var.mesh != null ? [lookup(one(module.mesh[*].service_discovery), each.key)] : []
+    content {
+      registry_arn = service_registries.value
+    }
+  }
 
   lifecycle {
     ignore_changes = [task_definition, desired_count]
   }
 
   depends_on = [
-    module.task
+    aws_ecs_task_definition.task
   ]
 }
 

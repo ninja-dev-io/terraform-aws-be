@@ -1,36 +1,15 @@
 variable "ecs" {
   type = object({
     cluster_name = string
-    consul_server = object({
-      requires_compatibilities    = list(string)
-      cpu                         = number
-      memory                      = number
-      subnets                     = list(string)
-      target_group                = string
-      security_groups             = list(string)
-      lb_enabled                  = bool
-      consul_image                = string
-      consul_license              = string
-      name                        = string
-      service_discovery_namespace = string
-      tags                        = map(string)
-      launch_type                 = string
-      assign_public_ip            = bool
-      tls                         = bool
-      gossip_key_secret_arn       = string
-      acls                        = bool
-      wait_for_steady_state       = bool
-    })
     tasks = list(object({
       name                     = string
       essential                = bool
+      network_mode             = string
       requires_compatibilities = list(string)
       cpu                      = number
       memory                   = number
-      port                     = number
       execution_role           = string
       task_role                = string
-      consul_datacenter        = string
       container_definitions = list(object({
         essential = bool
         healthCheck = object({
@@ -49,13 +28,11 @@ variable "ecs" {
           value = string
         }))
       }))
-      upstreams = list(object({
-        destinationName = string
-        localBindPort   = number
-      }))
     }))
     services = list(object({
       name                               = string
+      family                             = string
+      port                               = number
       desired_count                      = number
       deployment_minimum_healthy_percent = number
       deployment_maximum_percent         = number
@@ -88,6 +65,7 @@ variable "ecs" {
       log = object({
         retention_in_days = string
       })
+      backend = list(string)
     }))
   })
 }

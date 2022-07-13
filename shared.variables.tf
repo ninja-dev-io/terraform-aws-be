@@ -15,10 +15,7 @@ variable "security_groups" {
 }
 
 variable "roles" {
-  type = map(object({
-    id  = string
-    arn = string
-  }))
+  type = map(string)
 }
 
 variable "target_groups" {
