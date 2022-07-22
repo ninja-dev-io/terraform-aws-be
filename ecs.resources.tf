@@ -16,8 +16,8 @@ resource "aws_ecs_task_definition" "task" {
   container_definitions = jsonencode(
     [for definition in concat([for definition in each.value.container_definitions :
       merge(definition, {
-        name      = "${each.key}-service-${var.env}",
-        image     = "${aws_ecr_repository.ecr.repository_url}:${each.key}",
+        name      = definition.name != null ? definition.name : "${each.key}-service-${var.env}",
+        image     = definition.image != null ? definition.image : "${aws_ecr_repository.ecr.repository_url}:${each.key}",
         dependsOn = var.mesh != null ? [{ containerName = var.mesh.sidecar_proxy.name, condition = "HEALTHY" }] : []
       })
       ],

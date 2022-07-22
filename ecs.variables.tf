@@ -1,3 +1,7 @@
+terraform {
+  experiments = [module_variable_optional_attrs]
+}
+
 variable "ecs" {
   type = object({
     cluster_name = string
@@ -11,22 +15,25 @@ variable "ecs" {
       execution_role           = string
       task_role                = string
       container_definitions = list(object({
-        essential = bool
-        healthCheck = object({
+        name      = optional(string)
+        image     = optional(string)
+        command   = optional(list(string))
+        essential = optional(bool)
+        healthCheck = optional(object({
           command  = list(string)
           interval = number
           retries  = number
           timeout  = number
-        })
-        portMappings = list(object({
+        }))
+        portMappings = optional(list(object({
           protocol      = string
           containerPort = number
           hostPort      = number
-        }))
-        environment = list(object({
+        })))
+        environment = optional(list(object({
           name  = string
           value = string
-        }))
+        })))
       }))
     }))
     services = list(object({
