@@ -8,7 +8,6 @@ variable "rds" {
       engine_version          = string
       az                      = string
       multi_az                = bool
-      name                    = string
       username                = string
       subnets                 = list(string)
       security_groups         = list(string)

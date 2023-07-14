@@ -13,7 +13,6 @@ resource "aws_db_instance" "databases" {
   engine                  = each.value.engine
   engine_version          = each.value.engine_version
   username                = each.value.username
-  name                    = each.value.name
   password                = lookup(data.aws_ssm_parameter.master_password, each.key).value
   db_subnet_group_name    = lookup(aws_db_subnet_group.subnet_groups, each.key).name
   vpc_security_group_ids  = [for group in each.value.security_groups : lookup(var.security_groups, group)]
